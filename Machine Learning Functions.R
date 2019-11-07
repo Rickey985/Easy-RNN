@@ -984,207 +984,7 @@ ML_Builder_train=function(data=Factors_Train,dep=1,num_of_algos=c(''),pca_nums=c
   }
   
   if('RNN' %in% num_of_algos){
-    #Not working as of yet
-    set.seed(123456)
-    require(keras)
-    require(tensorflow)
-    port=as.data.table(all_data)
-    port=calc_CSnorm_dt(port,var_lst = list(N_Mom_365_30='Mom_365_30',N_ARM_100_REG='ARM_100_REG',N_EQ_REG_RANK='EQ_REG_RANK',
-                                                    N_Volatility_185_0='Volatility_185_0',N_DY='DY',N_CFY='CFY',N_EY='EY',N_eEY='eEY',N_Mom_31_0='Mom_31_0',
-                                                    N_SAL_eGrowth='SAL_eGrowth',N_EPS_eGrowth='EPS_eGrowth',N_ActiveFwdRet='ActiveFwdRet'
-    )
-    ,grp_col = c('Date'),InfNA = T,zscore = F,rnk=T,verbose = T)
-    
-    port=port[,c('ID','Date','ActiveFwdRet','Mom_365_30','ARM_100_REG','EQ_REG_RANK','Volatility_185_0','DY','CFY',
-                 'EY','eEY','SAL_eGrowth','EPS_eGrowth','Mom_31_0',
-                 'N_Mom_365_30','N_ARM_100_REG','N_EQ_REG_RANK','N_Volatility_185_0','N_DY','N_CFY',
-                 'N_EY','N_eEY','N_SAL_eGrowth','N_EPS_eGrowth','N_Mom_31_0')]
-    setorder(port,Date,ID)
-    invisible(lapply(names(port),function(.name) set(port, which(is.infinite(port[[.name]])), j = .name,value =NA)))
-    invisible(lapply(names(port),function(.name) set(port, which(is.nan(port[[.name]])), j = .name,value =NA)))
-    #Data prep for RNN
-    #In sample timestep: 40
-    step=seq_size
-    step_size<<-step
-    port[,Cor_Mom:=cor(Mom_365_30,ActiveFwdRet,use='pairwise.complete',method='spearman'),by=c('Date')]
-    port[,Cor_ARM:=cor(ARM_100_REG,ActiveFwdRet,use='pairwise.complete',method='spearman'),by=c('Date')]
-    port[,Cor_EQ:=cor(EQ_REG_RANK,ActiveFwdRet,use='pairwise.complete',method='spearman'),by=c('Date')]
-    port[,Cor_Vol:=cor(Volatility_185_0,ActiveFwdRet,use='pairwise.complete',method='spearman'),by=c('Date')]
-    port[,Cor_DY:=cor(DY,ActiveFwdRet,use='pairwise.complete',method='spearman'),by=c('Date')]
-    port[,Cor_CFY:=cor(CFY,ActiveFwdRet,use='pairwise.complete',method='spearman'),by=c('Date')]
-    port[,Cor_EY:=cor(EY,ActiveFwdRet,use='pairwise.complete',method='spearman'),by=c('Date')]
-    port[,Cor_eEY:=cor(eEY,ActiveFwdRet,use='pairwise.complete',method='spearman'),by=c('Date')]
-    port[,Cor_SAL:=cor(SAL_eGrowth,ActiveFwdRet,use='pairwise.complete',method='spearman'),by=c('Date')]
-    port[,Cor_EPS:=cor(EPS_eGrowth,ActiveFwdRet,use='pairwise.complete',method='spearman'),by=c('Date')]
-    port[,Cor_Mom31:=cor(Mom_31_0,ActiveFwdRet,use='pairwise.complete',method='spearman'),by=c('Date')]
-    
-    #Outputs to find
-    if(bench[1]=='CA'){
-      port[,Value:=mean(c(N_DY,N_CFY,N_EY,N_eEY),na.rm = T),by=c('ID','Date')]
-      port[,Mom:=mean(c(N_Mom_365_30,N_ARM_100_REG),na.rm = T),by=c('ID','Date')]
-      port[,Qual:=mean(c(N_Volatility_185_0,N_EQ_REG_RANK),na.rm = T),by=c('ID','Date')]
-    }
-    if(bench[1]=='US'){
-      port[,Value:=mean(c(N_DY,N_CFY,N_EY,N_eEY),na.rm = T),by=c('ID','Date')]
-      port[,Mom:=mean(c(N_Mom_365_30,N_Mom_365_30,N_ARM_100_REG,N_ARM_100_REG,N_EPS_eGrowth,N_SAL_eGrowth),na.rm = T),by=c('ID','Date')]
-      port[,Qual:=mean(c(N_Volatility_185_0,N_EQ_REG_RANK),na.rm = T),by=c('ID','Date')]
-    }
-
-    port[,Cor_Value:=cor(Value,ActiveFwdRet,use='pairwise.complete',method='spearman'),by=c('Date')]
-    port[,Cor_Momentum:=cor(Mom,ActiveFwdRet,use='pairwise.complete',method='spearman'),by=c('Date')]
-    port[,Cor_Qual:=cor(Qual,ActiveFwdRet,use='pairwise.complete',method='spearman'),by=c('Date')]
-    
-    #Normalized inputs
-    port[,Norm_Mom:=mean(Mom_365_30,na.rm = T),by=c('Date')]
-    port[,Norm_ARM:=mean(ARM_100_REG,na.rm = T),by=c('Date')]
-    port[,Norm_EQ:=mean(EQ_REG_RANK,na.rm = T),by=c('Date')]
-    port[,Norm_Vol:=mean(Volatility_185_0,na.rm = T),by=c('Date')]
-    port[,Norm_DY:=mean(DY,na.rm = T),by=c('Date')]
-    port[,Norm_CFY:=mean(CFY,na.rm = T),by=c('Date')]
-    port[,Norm_EY:=mean(EY,na.rm = T),by=c('Date')]
-    port[,Norm_eEY:=mean(eEY,na.rm = T),by=c('Date')]
-    port[,Norm_SAL:=mean(SAL_eGrowth,na.rm = T),by=c('Date')]
-    port[,Norm_EPS:=mean(EPS_eGrowth,na.rm = T),by=c('Date')]
-    port[,Norm_Mom31:=mean(Mom_31_0,na.rm = T),by=c('Date')]
-    
-    port[,SD_Mom:=var(Mom_365_30,na.rm = T),by=c('Date')]
-    port[,SD_ARM:=var(ARM_100_REG,na.rm = T),by=c('Date')]
-    port[,SD_EQ:=var(EQ_REG_RANK,na.rm = T),by=c('Date')]
-    port[,SD_Vol:=var(Volatility_185_0,na.rm = T),by=c('Date')]
-    port[,SD_DY:=var(DY,na.rm = T),by=c('Date')]
-    port[,SD_CFY:=var(CFY,na.rm = T),by=c('Date')]
-    port[,SD_EY:=var(EY,na.rm = T),by=c('Date')]
-    port[,SD_eEY:=var(eEY,na.rm = T),by=c('Date')]
-    port[,SD_SAL:=var(SAL_eGrowth,na.rm = T),by=c('Date')]
-    port[,SD_EPS:=var(EPS_eGrowth,na.rm = T),by=c('Date')]
-    port[,SD_Mom31:=var(Mom_31_0,na.rm = T),by=c('Date')]
-    
-    port[,IQR_Mom:=IQR(Mom_365_30,na.rm = T),by=c('Date')]
-    port[,IQR_ARM:=IQR(ARM_100_REG,na.rm = T),by=c('Date')]
-    port[,IQR_EQ:=IQR(EQ_REG_RANK,na.rm = T),by=c('Date')]
-    port[,IQR_Vol:=IQR(Volatility_185_0,na.rm = T),by=c('Date')]
-    port[,IQR_DY:=IQR(DY,na.rm = T),by=c('Date')]
-    port[,IQR_CFY:=IQR(CFY,na.rm = T),by=c('Date')]
-    port[,IQR_EY:=IQR(EY,na.rm = T),by=c('Date')]
-    port[,IQR_eEY:=IQR(eEY,na.rm = T),by=c('Date')]
-    port[,IQR_SAL:=IQR(SAL_eGrowth,na.rm = T),by=c('Date')]
-    port[,IQR_EPS:=IQR(EPS_eGrowth,na.rm = T),by=c('Date')]
-    port[,IQR_Mom31:=IQR(Mom_31_0,na.rm = T),by=c('Date')]
-    
-    port[,K_Mom:=kurtosis(Mom_365_30,na.rm = T),by=c('Date')]
-    port[,K_ARM:=kurtosis(ARM_100_REG,na.rm = T),by=c('Date')]
-    port[,K_EQ:=kurtosis(EQ_REG_RANK,na.rm = T),by=c('Date')]
-    port[,K_Vol:=kurtosis(Volatility_185_0,na.rm = T),by=c('Date')]
-    port[,K_DY:=kurtosis(DY,na.rm = T),by=c('Date')]
-    port[,K_CFY:=kurtosis(CFY,na.rm = T),by=c('Date')]
-    port[,K_EY:=kurtosis(EY,na.rm = T),by=c('Date')]
-    port[,K_eEY:=kurtosis(eEY,na.rm = T),by=c('Date')]
-    port[,K_SAL:=kurtosis(SAL_eGrowth,na.rm = T),by=c('Date')]
-    port[,K_EPS:=kurtosis(EPS_eGrowth,na.rm = T),by=c('Date')]
-    port[,K_Mom31:=kurtosis(Mom_31_0,na.rm = T),by=c('Date')]
-    
-    port[,S_Mom:=skewness(Mom_365_30,na.rm = T),by=c('Date')]
-    port[,S_ARM:=skewness(ARM_100_REG,na.rm = T),by=c('Date')]
-    port[,S_EQ:=skewness(EQ_REG_RANK,na.rm = T),by=c('Date')]
-    port[,S_Vol:=skewness(Volatility_185_0,na.rm = T),by=c('Date')]
-    port[,S_DY:=skewness(DY,na.rm = T),by=c('Date')]
-    port[,S_CFY:=skewness(CFY,na.rm = T),by=c('Date')]
-    port[,S_EY:=skewness(EY,na.rm = T),by=c('Date')]
-    port[,S_eEY:=skewness(eEY,na.rm = T),by=c('Date')]
-    port[,S_SAL:=skewness(SAL_eGrowth,na.rm = T),by=c('Date')]
-    port[,S_EPS:=skewness(EPS_eGrowth,na.rm = T),by=c('Date')]
-    port[,S_Mom31:=skewness(Mom_31_0,na.rm = T),by=c('Date')]
-    
-    og_port=port
-    port=unique(port,by=c('Date'))
-    setorder(port,Date,ID)
-    #Additional inputs to use
-    port[,U_Cor_Mom:=shift(Cor_Mom,n=2,typ='lag')]
-    port[,U_Cor_ARM:=shift(Cor_ARM,n=2,typ='lag')]
-    port[,U_Cor_EQ:=shift(Cor_EQ,n=2,typ='lag')]
-    port[,U_Cor_Vol:=shift(Cor_Vol,n=2,typ='lag')]
-    port[,U_Cor_DY:=shift(Cor_DY,n=2,typ='lag')]
-    port[,U_Cor_CFY:=shift(Cor_CFY,n=2,typ='lag')]
-    port[,U_Cor_EY:=shift(Cor_EY,n=2,typ='lag')]
-    port[,U_Cor_eEY:=shift(Cor_eEY,n=2,typ='lag')]
-    port[,U_Cor_SAL:=shift(Cor_SAL,n=2,typ='lag')]
-    port[,U_Cor_EPS:=shift(Cor_EPS,n=2,typ='lag')]
-    port[,U_Cor_Mom31:=shift(Cor_Mom31,n=2,typ='lag')]
-    port[,U_Value:=shift(Cor_Value,n=2,typ='lag')]
-    port[,U_Momentum:=shift(Cor_Momentum,n=2,typ='lag')]
-    port[,U_Qual:=shift(Cor_Qual,n=2,typ='lag')]
-    #Sending the last out one as the y sample, AKA, what we want to predict on
-    in_sample=port[,c('Norm_Mom','Norm_ARM','Norm_EQ','Norm_Vol','Norm_DY','Norm_CFY','Norm_EY','Norm_eEY','Norm_SAL',
-                      'Norm_EPS','Norm_Mom31',
-                      'SD_Mom','SD_ARM','SD_EQ','SD_Vol','SD_DY','SD_CFY','SD_EY','SD_eEY','SD_SAL',
-                      'SD_EPS','SD_Mom31',
-                      'IQR_Mom','IQR_ARM','IQR_EQ','IQR_Vol','IQR_DY','IQR_CFY','IQR_EY','IQR_eEY','IQR_SAL',
-                      'IQR_EPS','IQR_Mom31',
-                      'K_Mom','K_ARM','K_EQ','K_Vol','K_DY','K_CFY','K_EY','K_eEY','K_SAL','K_EPS','K_Mom31',
-                      'S_Mom','S_ARM','S_EQ','S_Vol','S_DY','S_CFY','S_EY','S_eEY','S_SAL','S_EPS','S_Mom31',
-                      'U_Cor_Mom','U_Cor_ARM','U_Cor_EQ','U_Cor_Vol','U_Cor_DY','U_Cor_CFY','U_Cor_EY',
-                      'U_Cor_eEY','U_Cor_SAL','U_Cor_EPS','U_Cor_Mom31','U_Value','U_Momentum','U_Qual')]
-    out_sample=port[,c('Cor_Value','Cor_Mom','Cor_Qual')]
-    Xs=in_sample[Norm_Mom==564654654]
-    Ys=out_sample[Cor_Mom==5]
-    sample=length(unique(port$Date))-step
-    for(l in seq(1,sample)){
-      print(paste('Doing the first',l,'groups (rolling)'))
-      first_in=in_sample[l+seq(0,step),]
-      first_out=out_sample[l+c(step),]
-      Xs=rbind(Xs,first_in)
-      Ys=rbind(Ys,first_out)
-    }
-    
-    x=Xs
-    n_col=ncol(x)
-    x=as.matrix(x)
-    x[is.infinite(x) | is.na(x) | is.nan(x)]=0
-    y=as.matrix(Ys$Cor_Mom)
-    y2=as.matrix(Ys$Cor_Value)
-    y3=as.matrix(Ys$Cor_Qual)
-    
-    #Time to re-arrange X and Y appropriately (to array)
-    X=array(x,dim=c(sample,step,n_col))
-    Y=array(y,dim=c(sample,1))
-    Y2=array(y2,dim=c(sample,1))
-    Y3=array(y3,dim=c(sample,1))
-    
-    RNN_Mo<<- keras_model_sequential() %>%
-      bidirectional(layer_gru(units=10,return_sequences = T),input_shape=c(step,n_col)) %>%
-      layer_dropout(0.2) %>%
-      bidirectional(layer_gru(units=10)) %>%
-      layer_dropout(0.2) %>%
-      layer_dense(units=1)
-    RNN_Mo %>% compile(loss = 'mse',optimizer = 'adam')
-    filepath="weights.best.hdf5"
-    dank_back=callback_model_checkpoint(filepath,monitor='val_loss',verbose=1,save_best_only = T,save_weights_only = T,mode='min')
-    RNN_Mo  %>% fit(X,Y,epochs=1200,validation_split=0.25,verbose=1,callbacks=list(dank_back))
-    RNN_Mo %>% load_model_weights_hdf5(filepath = filepath)
-    
-    RNN_Val<<- keras_model_sequential() %>% 
-      bidirectional(layer_gru(units=10,return_sequences = T),input_shape=c(step,n_col)) %>%
-      layer_dropout(0.2) %>%
-      bidirectional(layer_gru(units=10)) %>%
-      layer_dropout(0.2) %>%
-      layer_dense(units=1)
-    RNN_Val %>% compile(loss = 'mse',optimizer = 'adam')
-    filepath="weights.best.hdf5"
-    dank_back=callback_model_checkpoint(filepath,monitor='val_loss',verbose=1,save_best_only = T,save_weights_only = T,mode='min')
-    RNN_Val  %>% fit(X,Y2,epochs=1200,validation_split=0.25,verbose=1,callbacks=list(dank_back))
-    RNN_Val %>% load_model_weights_hdf5(filepath = filepath)
-    
-    RNN_Qual<<- keras_model_sequential() %>% 
-      bidirectional(layer_gru(units=10,return_sequences = T),input_shape=c(step,n_col)) %>%
-      layer_dropout(0.2) %>%
-      bidirectional(layer_gru(units=10)) %>%
-      layer_dropout(0.2) %>%
-      layer_dense(units=1)
-    RNN_Qual %>% compile(loss = 'mse',optimizer = 'adam')
-    filepath="weights.best.hdf5"
-    dank_back=callback_model_checkpoint(filepath,monitor='val_loss',verbose=1,save_best_only = T,save_weights_only = T,mode='min')
-    RNN_Qual  %>% fit(X,Y3,epochs=1200,validation_split=0.25,verbose=1,callbacks=list(dank_back))
-    RNN_Qual %>% load_model_weights_hdf5(filepath = filepath)
+    #Blank
     
   }
   
@@ -4738,30 +4538,34 @@ ML_Builder_test=function(data=Factors_Test,num_of_algos=c(''),only=c('All','Valu
 
 
 EZ_RNN_REG_Train=function(train_data,y_col,step_to_go_back=5,units_in_first=600,
-                          units_in_second=600,drop_data=0.25,iterations=150){
-  print("Here's a quick guide:\n data=you input the data here, make sure that besides the ID, and Date
-        The other columns have already been aggregated on a per Date basis.\n  y_col is the y column you are
-        trying to solve for.\n  Step_to_go_back is how many dates back you want the RNN to study")
+                          units_in_second=600,drop_data=0.25,iterations=150,mse_vs_mae=c('mse','mae'),
+                          optimizer=c('adam','adadelta','sgd','rmsprop','adagrad','adamax','nadam')){
+  print("Here's a quick guide:")
+  print("data=you input the data here, make sure that besides the ID, and Date
+        The other columns have already been aggregated on a per Date basis.")
+  print("y_col is the y column you aretrying to solve for")
+  print("Step_to_go_back is how many dates back you want the RNN to study")
+  print("Remember: No ID column, and This is only meant for a top down view")
+  print("I'd recomment going with the rmsprop/adam optimizer, as that's the one usually recommended for time series")
   set.seed(123456)
   require(keras)
   require(tensorflow)
   port=as.data.table(train_data)
-  setorder(port,Date,ID)
+  setorder(port,Date)
   step=step_to_go_back
   port=unique(port,by=c('Date'))
   
   #Split output from inputs, kick out date, and ID. then run TimeseriesGenerator from keras, batch_size=1,
   #   and length=step_size
+  setorder(port,Date)
   Ys=port[Date==123456789,c(y_col),with=F][,`:=`(ID=NULL,Date=NULL)]
   Xs=port[Date==123456789,!c(y_col),with=F][,`:=`(ID=NULL,Date=NULL)]
   port=port[,`:=`(ID=NULL,Date=NULL)]
   
-  x<<-Xs
-  y<<-Ys
-  portie<<-port
-  sample=length(unique(train_data$Date))-step
+  x=Xs
+  y=Ys
+  sample=length(unique(train_data$Date))-step-1
   for(l in seq(1,sample)){
-    print(paste('Doing the first',l,'groups (rolling)'))
     first_in=port[l+seq(0,step),!c(y_col),with=F]
     first_out=port[l+c(step),c(y_col),with=F]
     Xs=rbind(Xs,first_in)
@@ -4782,19 +4586,20 @@ EZ_RNN_REG_Train=function(train_data,y_col,step_to_go_back=5,units_in_first=600,
   
   set.seed(123456)
   tensorflow::use_session_with_seed(seed=123456)
-  EZ_RNN<<- keras_model_sequential() %>%
+  EZ_RNN<<-keras_model_sequential() %>%
     bidirectional(layer_lstm(units=units_in_first,return_sequences = T),input_shape=c(step,n_col)) %>%  #Change units only
     layer_dropout(drop_data) %>% #Change the number to whatever
     bidirectional(layer_lstm(units=units_in_second,return_sequences = F)) %>%  #Change units only
     layer_dropout(drop_data) %>% #Change the number to whatever
     layer_dense(units=1) #Don't touch this
-  EZ_RNN %>% compile(loss = 'mse',optimizer = 'adam') #Change optimizer & loss, to whatever is allowed on keras,
+  EZ_RNN %>% compile(loss = mse_vs_mae[1],optimizer = optimizer[1]) #Change optimizer & loss, to whatever is allowed on keras,
   filepath="weights.best.hdf5"
   dank_back=callback_model_checkpoint(filepath,monitor='val_loss',verbose=1,save_best_only = T,save_weights_only = T,mode='min',period=3)
-  EZ_RNN  %>% fit(X,Y,epochs=iterations,validation_split=0.20,verbose=1,callbacks=list(dank_back),batch_size=200)
+  EZ_RNN  %>% fit(X,Y,epochs=iterations,validation_split=0.20,verbose=1,callbacks=list(dank_back))
   EZ_RNN %>% load_model_weights_hdf5(filepath = filepath)
+  preds=EZ_RNN %>% predict(X)
+  
 }
-
 
 EZ_RNN_REG_Test=function(all_data,y_col,step_to_go_back,test_data_start_date,test_data_end_date){
   print('Make sure this step_to_go_back is the same as the one in the Train \n')
@@ -4808,27 +4613,29 @@ EZ_RNN_REG_Test=function(all_data,y_col,step_to_go_back,test_data_start_date,tes
   highest_date=as.Date(test_data_end_date)
   all_d=all_d[Date<=as.Date(highest_date)]
   port=as.data.table(all_d)
-  setorder(port,Date,ID)
+  setorder(port,Date)
   step_size=step_to_go_back
   
   test_set=all_d[Date>=as.Date(test_data_start_date) & Date<=as.Date(test_data_end_date)]
   
   #Data prep for RNN
   port=unique(port,by=c('Date'))
-  setorder(port,Date,ID)
+  setorder(port,Date)
   port[,Num:=1]
   port[,Posn:=cumsum(Num)]
-  starting_OS_date=as.Date(test_data_start_date)
+  starting_OS_date=as.Date(min(test_set$Date))
   port[Date==starting_OS_date,Position:=Posn]
   #Sending the last out one as the y sample, AKA, what we want to predict on
   #Oldie
   position=mean(port$Position,na.rm = T)-step_size-1
   sample=length(unique(test_set$Date))
+  setorder(port,Date)
   Xs=port[Date==123456789,!c(y_col),with=F][,`:=`(ID=NULL,Date=NULL,Position=NULL,Num=NULL,Posn=NULL)]
   port=port[,`:=`(ID=NULL,Date=NULL,Position=NULL,Num=NULL,Posn=NULL)][,!c(y_col),with=F]
+  portie_two<<-port
   print(paste('First Date in OS:',starting_OS_date))
+  posit<<-position
   for(l in seq(1,sample)){
-    print(paste('Doing the first',l,'groups (rolling)'))
     first_in=port[l+seq(0,step_size)+position,]
     Xs=rbind(Xs,first_in)
   }
@@ -4839,27 +4646,26 @@ EZ_RNN_REG_Test=function(all_data,y_col,step_to_go_back,test_data_start_date,tes
   #Ys[,RNN_CLASS:=0][Cor_Mom<0,RNN_CLASS:=1] #Class
   #y=to_categorical(Ys$RNN_CLASS,num_classes = 2) #Class
   
-  
+  xyz<<-x
   #Time to re-arrange X and Y appropriately (to array)
   X=array(x,dim=c(sample,step_size,n_col))
   print('Starting RNN Predictions')
   set.seed(123456)
   RNN_Preds=EZ_RNN %>% predict(X) #Class
-  Mo_Preds=RNN_Preds
-  print(paste('Preds:',Mo_Preds))
+  #print(paste('Preds:',RNN_Preds))
   port_dates=unique(all_data,by=c('Date'))[Date>=as.Date(test_data_start_date) & Date<=as.Date(test_data_end_date)]
   port_dates[,RNN_Predictions:=RNN_Preds]
-  port_dates=port_dates[,c('Date','RNN_Predictions')]
-  port_dates=merge(all_data,port_dates,by=c('Date'))
-  
+  port_dates=port_dates[,c('Date',y_col,'RNN_Predictions'),with=F]
 }
 
 EZ_RNN_REG=function(all_data,y_col,back_steps,test_data_start_date,test_data_end_date,
-                    units_in_first=600,units_in_second=600,drop_data=0.25,iterations=150){
+                    units_in_first=600,units_in_second=600,drop_data=0.25,iterations=150,mse_vs_mae=c('mse','mae'),
+                    optimizer=c('adam','adadelta','sgd','rmsprop','adagrad','adamax','nadam')){
   training=all_data[Date<as.Date(test_data_start_date)]
   training_chunk=EZ_RNN_REG_Train(training,y_col,step_to_go_back = back_steps,units_in_first,units_in_second,
-                                  drop_data,iterations)
-  
+                                  drop_data,iterations,mse_vs_mae)
   testing_chunk=EZ_RNN_REG_Test(all_data,y_col,step_to_go_back = back_steps,test_data_start_date,test_data_end_date)
+  print('FYI, you now have a new global variable called EZ_RNN')
   return(testing_chunk)
 }
+
